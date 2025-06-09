@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Viewport meta for proper mobile scaling (no extra zooming) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Catch the Ball - Mobile</title>
+  <!-- Firebase compat libraries for namespaced syntax -->
+  <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+  <style>
+    /* Base styles */
+    body {
+      margin: 0;
+      padding: 0;
+      text-align: center;
+      background-color: #f4f4f4;
+      overflow: hidden;
+    }
+    
+    /* Start Menu centered on screen */
+    #startMenu {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      border: 2px solid black;
+      text-align: center;
+      z-index: 30;
+    }
+    
+    /* Game container with a sky-blue gradient background */
+    #gameContainer {
+      position: absolute;
+      width: 100vw;
+      height: 100vh;
+      background: linear-gradient(to bottom, #87CEFA, #f0f8ff);
+      overflow: hidden;
+      display: none;
+    }
+    
+    /* Detailed basket styling – larger for better control */
+    #basket {
+      position: absolute;
+      width: 15%;
+      height: 8%;
+      bottom: 2%;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 50;
+      background: linear-gradient(to bottom, #8B4513, #A0522D);
+      border: 2px solid #654321;
+      border-radius: 8px;
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+    }
+    
+    /* Detailed ball styling */
+    .ball {
+      position: absolute;
+      width: 5%;
+      height: 5%;
+      background: radial-gradient(circle at 30% 30%, #ff4444, #cc0000);
+      border: 1px solid #990000;
+      border-radius: 50%;
+      box-shadow: 1px 1px 5px rgba(0,0,0,0.5);
+    }
+    
+    /* Score, Level, and Lives display */
+    #score, #level, #lives {
+      font-size: 2.5vw;
+      margin-top: 10px;
+      position: relative;
+      z-index: 40;
+    }
+    
+    /* Game Over overlay */
+    #gameOver {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      border: 2px solid black;
+      text-align: center;
+      z-index: 100;
+    }
+    
+    /* Retry button styling */
+    #retryBtn {
+      padding: 10px 20px;
+      font-size: 1.5vw;
+      background: green;
+      color: white;
+      cursor: pointer;
+    }
+    
+    /* Leaderboard styling */
+    #leaderboard {
+      position: absolute;
+      right: 2%;
+      top: 2%;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 5px;
+      border: 1px solid black;
+      font-size: 1.5vw;
+      max-width: 20%;
+      text-align: left;
+      z-index: 60;
+    }
+  </style>
+</head>
+<body>
+  <!-- Start Menu -->
+  <div id="startMenu">
+    <h2>Enter Your Name</h2>
+    <input type="text" id="usernameInput" placeholder="Your Name">
+    <br><br>
+    <button id="startBtn">Start Game</button>
+  </div>
+
+  <!-- Game Container -->
+  <div id="gameContainer">
+    <div id="score">Score: 0</div>
+    <div id="level">Level: 1</div>
+    <div id="lives">Lives: ❤️❤️❤️</div>
+    <!-- The Basket -->
+    <div id="basket"></div>
+    <!-- Leaderboard -->
+    <div id="leaderboard">
+      <h3>Leaderboard</h3>
+      <ul id="topScores"></ul>
+    </div>
+    <!-- Game Over Overlay -->
+    <div id="gameOver">
+      <h2>You Lost!</h2>
+      <button id="retryBtn">Retry</button>
+    </div>
+  </div>
+
+  <script>
+    // Firebase configuration (using only databaseURL for simplicity)
+    const firebaseConfig = {
+      databaseURL: "https://leaderboardgame-87e4d-default-rtdb.europe-west1.firebasedatabase.app/"
+    };
+
+    // Initialize Firebase using compat libraries.
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Get DOM elements.
+    let username = "";
+    const startMenu = document.getElementById("startMenu");
+    const startBtn = document.getElementById("startBtn");
+    const gameContainer = document.getElementById("gameContainer");
+    const usernameInput = document.getElementById("usernameInput");
+    const scoreDisplay = document.getElementById("score");
+    const levelDisplay = document.getElementById("level");
+    const livesDisplay = document.getElementById("lives");
+    const basket = document.getElementById("basket");
+    const leaderboard = document.getElementById("leaderboard");
+    const topScores = document.getElementById("topScores");
+    const gameOverScreen = document.getElementById("gameOver");
+    const retryBtn = document.getElementById("retryBtn");
+
+    // Game state variables.
+    let score = 0, lives = 3, level = 1, baseSpeed = 3;
+    let ballInterval; // Will hold the interval that creates balls.
+
+    // Function to start ball creation.
+    function startBallCreation() {
+      ballInterval = setInterval(createBall, 1200);
+    }
+    
+    // Function to stop the game.
+    function stopGame() {
+      clearInterval(ballInterval);
+    }
+
+    // Start game function triggered when the Start Game button is tapped.
+    function startGame() {
+      username = usernameInput.value.trim();
+      if (username === "") {
+        alert("Please enter your name!");
+        return;
+      }
+      startMenu.style.display = "none";
+      gameContainer.style.display = "block";
+      fetchLeaderboard();
+      startBallCreation();
+    }
+    startBtn.addEventListener("click", startGame);
+
+    // Touch control: Move the basket (centered on touch) along the entire bottom.
+    gameContainer.addEventListener("touchmove", function(event) {
+      event.preventDefault();
+      // Adjust by subtracting half the basket's width so that the basket's center matches the touch.
+      let touchX = event.touches[0].clientX - gameContainer.offsetLeft - (basket.clientWidth / 2);
+      if (touchX < 0) { touchX = 0; }
+      if (touchX > gameContainer.clientWidth - basket.clientWidth) {
+        touchX = gameContainer.clientWidth - basket.clientWidth;
+      }
+      basket.style.left = touchX + "px";
+    });
+
+    // Create a falling ball with updated detailed styles and collision detection.
+    function createBall() {
+      let ball = document.createElement("div");
+      ball.classList.add("ball");
+      ball.style.left = Math.random() * (gameContainer.clientWidth - 20) + "px";
+      ball.style.top = "0px";
+      gameContainer.appendChild(ball);
+      
+      let fallSpeed = baseSpeed + Math.floor(Math.random() * 5);
+      let fallInterval = setInterval(() => {
+        let ballTop = parseInt(ball.style.top) || 0;
+        if (ballTop > gameContainer.clientHeight - 40) {
+          // Ball reached the bottom without being caught.
+          clearInterval(fallInterval);
+          if (gameContainer.contains(ball)) {
+            gameContainer.removeChild(ball);
+          }
+          loseLife();
+        } else {
+          ball.style.top = ballTop + fallSpeed + "px";
+        }
+        
+        // Updated collision detection:
+        // If the ball's bottom touches the basket's top and there's horizontal overlap, count as a catch.
+        let basketRect = basket.getBoundingClientRect();
+        let ballRect = ball.getBoundingClientRect();
+        if ( ballRect.bottom >= basketRect.top &&
+             ballRect.left < basketRect.right &&
+             ballRect.right > basketRect.left ) {
+          clearInterval(fallInterval);
+          if (gameContainer.contains(ball)) {
+            gameContainer.removeChild(ball);
+          }
+          score++;
+          scoreDisplay.innerText = "Score: " + score;
+          updateLevel();
+        }
+      }, 30);
+    }
+
+    // Function to handle losing a life.
+    function loseLife() {
+      lives--;
+      livesDisplay.innerText = "Lives: " + "❤️".repeat(lives);
+      if (lives === 0) {
+        stopGame();       // Stop creating new balls.
+        saveScore();      // Save the player's score.
+        gameOverScreen.style.display = "block";
+      }
+    }
+
+    // Increase level and ball speed every 5 points.
+    function updateLevel() {
+      if (score % 5 === 0) {
+        level++;
+        levelDisplay.innerText = "Level: " + level;
+        baseSpeed++;
+      }
+    }
+
+    // Save the player's score to Firebase.
+    function saveScore() {
+      db.ref("scores/" + username).set({
+        name: username,
+        score: score
+      });
+    }
+
+    // Fetch the top 10 scores from Firebase and update the leaderboard.
+    function fetchLeaderboard() {
+      db.ref("scores")
+        .orderByChild("score")
+        .limitToLast(10)
+        .on("value", snapshot => {
+          topScores.innerHTML = "";
+          snapshot.forEach(data => {
+            let entry = data.val();
+            let listItem = document.createElement("li");
+            listItem.innerText = `${entry.name}: ${entry.score}`;
+            topScores.prepend(listItem);
+          });
+        });
+    }
+
+    // Retry button resets game state and restarts ball creation.
+    retryBtn.addEventListener("click", function() {
+      clearInterval(ballInterval);
+      score = 0;
+      lives = 3;
+      level = 1;
+      baseSpeed = 3;
+      scoreDisplay.innerText = "Score: 0";
+      levelDisplay.innerText = "Level: 1";
+      livesDisplay.innerText = "Lives: ❤️❤️❤️";
+      gameOverScreen.style.display = "none";
+      startBallCreation();
+    });
+  </script>
+</body>
+</html>
