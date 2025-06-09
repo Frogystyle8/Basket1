@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Catch the Ball - Mobile</title>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js"></script>
+    <style>
+        body { text-align: center; background-color: #f4f4f4; margin: 0; overflow: hidden; }
+        #startMenu { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                     background: white; padding: 20px; border: 2px solid black; text-align: center; }
+        #gameContainer { 
+            position: absolute; 
+            width: 100vw; 
+            height: 100vh; 
+            background-color: #ddd; 
+            overflow: hidden; 
+            display: none; 
+        }
+        #basket { position: absolute; width: 10%; height: 5%; bottom: 2%; background-color: brown; left: 50%; transform: translateX(-50%); }
+        .ball { position: absolute; width: 5%; height: 5%; background-color: red; border-radius: 50%; }
+        #score, #level { font-size: 2.5vw; margin-top: 10px; }
+        #lives { font-size: 2.5vw; color: red; }
+        #gameOver { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                    background: white; padding: 20px; border: 2px solid black; text-align: center; }
+        #retryBtn { padding: 10px 20px; font-size: 1.5vw; background: green; color: white; cursor: pointer; }
+        #leaderboard {
+            position: absolute;
+            right: 2%; 
+            top: 2%; 
+            background: rgba(255, 255, 255, 0.8);
+            padding: 5px;
+            border: 1px solid black;
+            font-size: 1.5vw;
+            max-width: 20%;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <div id="startMenu">
+        <h2>Enter Your Name</h2>
+        <input type="text" id="usernameInput">
+        <button onclick="startGame()">Start Game</button>
+    </div>
+
+    <div id="gameContainer">
+        <div id="score">Score: 0</div>
+        <div id="level">Level: 1</div>
+        <div id="lives">Lives: ❤️❤️❤️</div>
+        <div id="basket"></div>
+        <div id="leaderboard"><h3>Leaderboard</h3><ul id="topScores"></ul></div>
+        <div id="gameOver">
+            <h2>You Lost!</h2>
+            <button id="retryBtn">Retry</button>
+        </div>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            databaseURL: "https://leaderboardgame-87e4d-default-rtdb.europe-west1.firebasedatabase.app/"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        let username = "";
+        let basket = document.getElementById("basket");
+        let gameContainer = document.getElementById("gameContainer");
+        let scoreDisplay = document.getElementById("score");
+        let levelDisplay = document.getElementById("level");
+        let livesDisplay = document.getElementById("lives");
+        let gameOverScreen = document.getElementById("gameOver");
+        let retryBtn = document.getElementById("retryBtn");
+        let topScores = document.getElementById("topScores");
+
+        let score = 0, lives = 3, level = 1, baseSpeed = 3;
+
+        function startGame() {
+            username = document.getElementById("usernameInput").value;
+            if (username.trim() === "") return alert("Please enter your name!");
+            document.getElementById("startMenu").style.display = "none";
+            gameContainer.style.display = "block";
+            resizeGame();
+            fetchLeaderboard();
+        }
+
+        gameContainer.addEventListener("touchmove", function(event) {
+            let touchX = event.touches[0].clientX - gameContainer.offsetLeft;
+            if (touchX > 0 && touchX < gameContainer.clientWidth - basket.clientWidth) {
+                basket.style.left = touchX + "px";
+            }
+        });
+
+        function createBall() {
+            let ball = document.createElement("div");
+            ball.classList.add("ball");
+            ball.style.left = Math.random() * (gameContainer.clientWidth - 20) + "px";
+            ball.style.top = "0px";
+            gameContainer.appendChild(ball);
+
+            let fallSpeed = baseSpeed + Math.floor(Math.random() * 5);
+            let fallInterval = setInterval(() => {
+                let ballTop = parseInt(ball.style.top) || 0;
+                if (ballTop > gameContainer.clientHeight - 40) {
+                    clearInterval(fallInterval);
+                    gameContainer.removeChild(ball);
+                    loseLife();
+                } else {
+                    ball.style.top = ballTop + fallSpeed + "px";
+                }
+
+                let basketRect = basket.getBoundingClientRect();
+                let ballRect = ball.getBoundingClientRect();
+                if (ballRect.top > basketRect.top && ballRect.left > basketRect.left && ballRect.right < basketRect.right) {
+                    clearInterval(fallInterval);
+                    gameContainer.removeChild(ball);
+                    score++;
+                    scoreDisplay.innerText = "Score: " + score;
+                    updateLevel();
+                }
+            }, 30);
+        }
+
+        function loseLife() {
+            lives--;
+            livesDisplay.innerText = "Lives: " + "❤️".repeat(lives);
+            if (lives === 0) {
+                saveScore();
+                gameOverScreen.style.display = "block";
+            }
+        }
+
+        function updateLevel() {
+            if (score % 5 === 0) {
+                level++;
+                levelDisplay.innerText = "Level: " + level;
+                baseSpeed++;
+            }
+        }
+
+        function saveScore() {
+            db.ref("scores/" + username).set({
+                name: username,
+                score: score
+            });
+        }
+
+        function fetchLeaderboard() {
+            db.ref("scores").orderByChild("score").limitToLast(10).on("value", snapshot => {
+                topScores.innerHTML = "";
+                snapshot.forEach(data => {
+                    let entry = data.val();
+                    let listItem = document.createElement("li");
+                    listItem.innerText = `${entry.name}: ${entry.score}`;
+                    topScores.prepend(listItem);
+                });
+            });
+        }
+
+        function resizeGame() {
+            document.body.style.zoom = window.innerWidth / 400;
+        }
+
+        retryBtn.addEventListener("click", function() {
+            score = 0;
+            lives = 3;
+            level = 1;
+            baseSpeed = 3;
+            scoreDisplay.innerText = "Score: 0";
+            levelDisplay.innerText = "Level: 1";
+            livesDisplay.innerText = "Lives: ❤️❤️❤️";
+            gameOverScreen.style.display = "none";
+        });
+
+        setInterval(createBall, 1200);
+    </script>
+</body>
+</html>
