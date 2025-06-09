@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Ensure proper mobile scaling -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Catch the Ball - Mobile</title>
+  <!-- Firebase compat libraries for namespaced syntax -->
+  <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+  <style>
+    /* Basic reset and body centering using flexbox */
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+
+    /* Start Menu styling */
+    #startMenu {
+      background: white;
+      padding: 20px;
+      border: 2px solid black;
+      z-index: 30;
+    }
+
+    /* Customize Scene container – same fixed size as game container */
+    #customizeScene {
+      position: relative;
+      width: 320px;
+      height: 480px;
+      background: linear-gradient(to bottom, #fff, #eee);
+      border: 1px solid #999;
+      display: none;
+      box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+    }
+    /* Customize Scene contents */
+    #customizeScene h2 {
+      margin-top: 20px;
+    }
+    #basketPreview {
+      width: 150px;
+      height: 50px;
+      margin: 20px auto;
+      position: relative;
+      border: 2px solid #333;
+      border-radius: 8px;
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+    }
+    #arrowContainer {
+      margin: 20px;
+    }
+    button.arrowBtn {
+      font-size: 20px;
+      padding: 5px 10px;
+      margin: 0 10px;
+      cursor: pointer;
+    }
+    #okBtn {
+      padding: 10px 20px;
+      font-size: 16px;
+      background: #28a745;
+      color: white;
+      border: none;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+
+    /* Fixed Game Container (320 x 480) centered via flexbox */
+    #gameContainer {
+      position: relative;
+      width: 320px;
+      height: 480px;
+      background: linear-gradient(to bottom, #87CEFA, #f0f8ff);
+      border: 1px solid #999;
+      box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+      overflow: hidden;
+      display: none;
+    }
+
+    /* Animated clouds for visual depth */
+    .cloud {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 50%;
+      box-shadow: 0 0 10px rgba(255,255,255,0.9);
+      opacity: 0.9;
+      animation: floatClouds linear infinite;
+    }
+    #cloud1 {
+      width: 50px;
+      height: 30px;
+      top: 10%;
+      left: -50px;
+      animation-duration: 25s;
+    }
+    #cloud2 {
+      width: 70px;
+      height: 40px;
+      top: 20%;
+      left: -70px;
+      animation-duration: 35s;
+    }
+    @keyframes floatClouds {
+      from { transform: translateX(0); }
+      to { transform: translateX(400px); }
+    }
+
+    /* Base basket styling (used for positioning) */
+    #basket {
+      position: absolute;
+      width: 15%;
+      height: 8%;
+      bottom: 2%;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 50;
+    }
+    /* Unique basket design classes */
+    .basketStyle1 {
+      background: linear-gradient(to bottom, #8B4513, #A0522D);
+      border: 2px solid #654321;
+      border-radius: 8px;
+    }
+    .basketStyle2 {
+      background: linear-gradient(to bottom, #FF8C00, #FFA500);
+      border: 2px solid #CD661D;
+      border-radius: 50%;
+    }
+    .basketStyle3 {
+      background: linear-gradient(to bottom, #FFDAB9, #FFB6C1);
+      border: 2px solid #FF69B4;
+      border-radius: 10px;
+    }
+    .basketStyle4 {
+      background: linear-gradient(to bottom, #2F4F4F, #696969);
+      border: 2px solid #000;
+      border-radius: 4px;
+    }
+    .basketStyle5 {
+      background: linear-gradient(to bottom, #1E90FF, #00BFFF);
+      border: 2px solid #00008B;
+      border-radius: 12px;
+    }
+    /* Pseudo-element handle for all basket styles */
+    .basketStyle1::after,
+    .basketStyle2::after,
+    .basketStyle3::after,
+    .basketStyle4::after,
+    .basketStyle5::after {
+      content: "";
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 40%;
+      height: 10px;
+      background: #333;
+      border-radius: 50%;
+    }
+
+    /* Detailed ball styling */
+    .ball {
+      position: absolute;
+      width: 5%;
+      height: 5%;
+      background: radial-gradient(circle at 30% 30%, #ff4444, #cc0000);
+      border: 1px solid #990000;
+      border-radius: 50%;
+      box-shadow: 1px 1px 5px rgba(0,0,0,0.5);
+    }
+
+    /* Obstacle styling */
+    .obstacle {
+      position: absolute;
+      width: 6%;
+      height: 6%;
+      background: radial-gradient(circle, #777, #333);
+      border: 1px solid #111;
+      border-radius: 50%;
+      box-shadow: 1px 1px 4px rgba(0,0,0,0.7);
+    }
+
+    /* Particle effect styling */
+    .particle {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: gold;
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 1;
+      animation: particleFade 0.6s forwards;
+    }
+    @keyframes particleFade {
+      to {
+        transform: translateY(-20px);
+        opacity: 0;
+      }
+    }
+
+    /* Game Information (Score, Level, Lives) */
+    #score, #level, #lives {
+      font-size: 16px;
+      position: absolute;
+      z-index: 40;
+    }
+    #score { left: 5%; top: 5%; }
+    #level { left: 5%; top: 25%; }
+    #lives { right: 5%; top: 5%; }
+
+    /* Leaderboard styling */
+    #leaderboard {
+      position: absolute;
+      right: 2%;
+      top: 35%;
+      background: rgba(255, 255, 255, 0.8);
+      padding: 5px;
+      border: 1px solid black;
+      font-size: 14px;
+      max-width: 40%;
+      text-align: left;
+      z-index: 60;
+    }
+    #leaderboard h3 {
+      margin: 0;
+      font-size: 16px;
+    }
+    #leaderboard ul {
+      list-style: none;
+      padding: 0;
+      margin: 5px 0 0 0;
+    }
+    #leaderboard li {
+      margin: 2px 0;
+    }
+
+    /* Game Over overlay styling, including additional buttons */
+    #gameOver {
+      display: none;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      border: 2px solid black;
+      z-index: 100;
+      text-align: center;
+    }
+    /* Buttons in Game Over */
+    #retryBtn, #helpBtn, #customizeBtn {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 5px;
+      cursor: pointer;
+      border: none;
+      color: white;
+    }
+    #retryBtn { background: green; }
+    #helpBtn { background: #0077cc; }
+    #customizeBtn { background: #FF69B4; }
+    /* Help text hidden by default */
+    #helpText {
+      display: none;
+      font-size: 14px;
+      color: #000;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <!-- Start Menu -->
+  <div id="startMenu">
+    <h2>Enter Your Name</h2>
+    <input type="text" id="usernameInput" placeholder="Your Name" />
+    <br /><br />
+    <button id="startBtn">Start Game</button>
+  </div>
+
+  <!-- Customize Scene -->
+  <div id="customizeScene">
+    <h2>Customize Your Basket</h2>
+    <div id="basketPreview" class="basketStyle1"></div>
+    <div id="arrowContainer">
+      <button id="arrowLeft" class="arrowBtn">←</button>
+      <button id="arrowRight" class="arrowBtn">→</button>
+    </div>
+    <button id="okBtn">OK</button>
+  </div>
+
+  <!-- Game Container -->
+  <div id="gameContainer">
+    <!-- Animated Clouds -->
+    <div id="cloud1" class="cloud"></div>
+    <div id="cloud2" class="cloud"></div>
+    
+    <!-- Game Information -->
+    <div id="score">Score: 0</div>
+    <div id="level">Level: 1</div>
+    <div id="lives">Lives: ❤️❤️❤️</div>
+    
+    <!-- The Basket (its look set via customization) -->
+    <div id="basket" class="basketStyle1"></div>
+    
+    <!-- Leaderboard -->
+    <div id="leaderboard">
+      <h3>Leaderboard</h3>
+      <ul id="topScores"></ul>
+    </div>
+    
+    <!-- Game Over overlay -->
+    <div id="gameOver">
+      <h2>You Lost!</h2>
+      <button id="retryBtn">Retry</button>
+      <button id="helpBtn">Help</button>
+      <button id="customizeBtn">Customize</button>
+      <div id="helpText">Collect the red ones and evade the black ones.</div>
+    </div>
+  </div>
+
+  <script>
+    // --- Sound Effects and Music Setup ---
+    // Make sure these files are accessible from your project directory.
+    const backgroundMusic = new Audio("Pixel-Peeker-Polka-faster(chosic.com).mp3");
+    backgroundMusic.loop = true;
+    const catchSound = new Audio("361887__jalastram__gui-sound-effects_059.wav");
+    // You may add other sounds like hitSound or gameOverSound as needed.
+    const hitSound = new Audio("hitSound.mp3");       // Replace with your desired hit sound file if needed.
+    const gameOverSound = new Audio("gameOverSound.mp3"); // Replace with your desired game over sound file if needed.
+
+    // --- Firebase Setup ---
+    const firebaseConfig = {
+      databaseURL: "https://leaderboardgame-87e4d-default-rtdb.europe-west1.firebasedatabase.app/"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // --- DOM Elements ---
+    let username = "";
+    const startMenu = document.getElementById("startMenu");
+    const startBtn = document.getElementById("startBtn");
+    const customizeScene = document.getElementById("customizeScene");
+    const basketPreview = document.getElementById("basketPreview");
+    const arrowLeft = document.getElementById("arrowLeft");
+    const arrowRight = document.getElementById("arrowRight");
+    const okBtn = document.getElementById("okBtn");
+    
+    const gameContainer = document.getElementById("gameContainer");
+    const usernameInput = document.getElementById("usernameInput");
+    const scoreDisplay = document.getElementById("score");
+    const levelDisplay = document.getElementById("level");
+    const livesDisplay = document.getElementById("lives");
+    const basket = document.getElementById("basket");
+    const leaderboard = document.getElementById("leaderboard");
+    const topScores = document.getElementById("topScores");
+    const gameOverScreen = document.getElementById("gameOver");
+    const retryBtn = document.getElementById("retryBtn");
+    const helpBtn = document.getElementById("helpBtn");
+    const customizeBtn = document.getElementById("customizeBtn");
+    const helpText = document.getElementById("helpText");
+
+    // --- Customization Variables ---
+    let selectedBasketIndex = 0;
+    const basketDesigns = ["basketStyle1", "basketStyle2", "basketStyle3", "basketStyle4", "basketStyle5"];
+    
+    // Update basket preview based on arrow button clicks
+    arrowLeft.addEventListener("click", () => {
+      selectedBasketIndex = (selectedBasketIndex - 1 + basketDesigns.length) % basketDesigns.length;
+      updateBasketPreview();
+    });
+    arrowRight.addEventListener("click", () => {
+      selectedBasketIndex = (selectedBasketIndex + 1) % basketDesigns.length;
+      updateBasketPreview();
+    });
+    function updateBasketPreview() {
+      basketPreview.className = "";
+      basketPreview.classList.add(basketDesigns[selectedBasketIndex]);
+    }
+    updateBasketPreview(); // Initialize preview
+
+    // OK button: Confirm customization and start game
+    okBtn.addEventListener("click", () => {
+      customizeScene.style.display = "none";
+      // Set the game basket design using the selected style
+      basket.className = basketDesigns[selectedBasketIndex];
+      resetGameState();
+      gameContainer.style.display = "block";
+      fetchLeaderboard();
+      startBallCreation();
+      startObstacleCreation();
+      // Start background music
+      backgroundMusic.currentTime = 0;
+      backgroundMusic.play();
+    });
+
+    // Start menu button now leads to customization scene
+    startBtn.addEventListener("click", () => {
+      username = usernameInput.value.trim();
+      if (username === "") {
+        alert("Please enter your name!");
+        return;
+      }
+      startMenu.style.display = "none";
+      customizeScene.style.display = "block";
+    });
+
+    // In Game Over overlay, Customize button resets game state and shows customization scene
+    customizeBtn.addEventListener("click", () => {
+      stopGame();
+      resetGameState();
+      gameOverScreen.style.display = "none";
+      customizeScene.style.display = "block";
+      // Pause background music
+      backgroundMusic.pause();
+    });
+
+    // Help button toggles help text display
+    helpBtn.addEventListener("click", () => {
+      helpText.style.display = (helpText.style.display === "none" || helpText.style.display === "") 
+        ? "block" 
+        : "none";
+    });
+
+    // Touch control: Move the basket within the game container
+    gameContainer.addEventListener("touchmove", function (event) {
+      event.preventDefault();
+      const containerRect = gameContainer.getBoundingClientRect();
+      let touchX = event.touches[0].clientX - containerRect.left - basket.clientWidth / 2;
+      if (touchX < 0) touchX = 0;
+      if (touchX > gameContainer.clientWidth - basket.clientWidth) 
+        touchX = gameContainer.clientWidth - basket.clientWidth;
+      basket.style.left = touchX + "px";
+    });
+
+    // --- Game State Variables ---
+    let score = 0, lives = 3, level = 1, baseSpeed = 3;
+    let ballInterval, obstacleInterval;
+
+    // Reset game state (clears intervals, resets score/lives/level) and updates UI
+    function resetGameState() {
+      clearInterval(ballInterval);
+      clearInterval(obstacleInterval);
+      score = 0;
+      lives = 3;
+      level = 1;
+      baseSpeed = 3;
+      scoreDisplay.innerText = "Score: 0";
+      levelDisplay.innerText = "Level: 1";
+      livesDisplay.innerText = "Lives: ❤️❤️❤️";
+    }
+
+    // Start creation of falling balls
+    function startBallCreation() {
+      ballInterval = setInterval(createBall, 1200);
+    }
+
+    // Start creation of falling obstacles
+    function startObstacleCreation() {
+      obstacleInterval = setInterval(createObstacle, 2500);
+    }
+
+    // Stop ball and obstacle creation
+    function stopGame() {
+      clearInterval(ballInterval);
+      clearInterval(obstacleInterval);
+    }
+
+    // Create a falling ball
+    function createBall() {
+      let ball = document.createElement("div");
+      ball.classList.add("ball");
+      ball.style.left = Math.random() * (gameContainer.clientWidth - 20) + "px";
+      ball.style.top = "0px";
+      gameContainer.appendChild(ball);
+
+      let fallSpeed = baseSpeed + Math.floor(Math.random() * 5);
+      let fallInterval = setInterval(() => {
+        let ballTop = parseInt(ball.style.top) || 0;
+        if (ballTop > gameContainer.clientHeight - 40) {
+          clearInterval(fallInterval);
+          if (gameContainer.contains(ball)) 
+            gameContainer.removeChild(ball);
+          loseLife();
+        } else {
+          ball.style.top = ballTop + fallSpeed + "px";
+        }
+        let basketRect = basket.getBoundingClientRect();
+        let ballRect = ball.getBoundingClientRect();
+        if (
+          ballRect.bottom >= basketRect.top &&
+          ballRect.left < basketRect.right &&
+          ballRect.right > basketRect.left
+        ) {
+          clearInterval(fallInterval);
+          if (gameContainer.contains(ball)) 
+            gameContainer.removeChild(ball);
+          score++;
+          scoreDisplay.innerText = "Score: " + score;
+          updateLevel();
+          // Play ball touched effect (catch sound)
+          catchSound.currentTime = 0;
+          catchSound.play();
+          let containerRect = gameContainer.getBoundingClientRect();
+          let particleX = basketRect.left + basketRect.width / 2 - containerRect.left;
+          let particleY = basketRect.top - containerRect.top;
+          showParticles(particleX, particleY);
+        }
+      }, 30);
+    }
+
+    // Create a falling obstacle
+    function createObstacle() {
+      let obstacle = document.createElement("div");
+      obstacle.classList.add("obstacle");
+      obstacle.style.left = Math.random() * (gameContainer.clientWidth - 30) + "px";
+      obstacle.style.top = "0px";
+      gameContainer.appendChild(obstacle);
+
+      let fallSpeed = baseSpeed + Math.floor(Math.random() * 3) + 2;
+      let fallInterval = setInterval(() => {
+        let obstacleTop = parseInt(obstacle.style.top) || 0;
+        if (obstacleTop > gameContainer.clientHeight - 30) {
+          clearInterval(fallInterval);
+          if (gameContainer.contains(obstacle)) 
+            gameContainer.removeChild(obstacle);
+        } else {
+          obstacle.style.top = obstacleTop + fallSpeed + "px";
+        }
+        let basketRect = basket.getBoundingClientRect();
+        let obstacleRect = obstacle.getBoundingClientRect();
+        if (
+          obstacleRect.bottom >= basketRect.top &&
+          obstacleRect.left < basketRect.right &&
+          obstacleRect.right > basketRect.left
+        ) {
+          clearInterval(fallInterval);
+          if (gameContainer.contains(obstacle)) 
+            gameContainer.removeChild(obstacle);
+          loseLife();
+        }
+      }, 30);
+    }
+
+    // Particle effect: Create small particles that animate upward and fade out
+    function showParticles(x, y) {
+      for (let i = 0; i < 8; i++) {
+        let particle = document.createElement("div");
+        particle.classList.add("particle");
+        particle.style.left = x + "px";
+        particle.style.top = y + "px";
+        gameContainer.appendChild(particle);
+        setTimeout(() => {
+          if (gameContainer.contains(particle)) 
+            gameContainer.removeChild(particle);
+        }, 600);
+      }
+    }
+
+    // When a life is lost
+    function loseLife() {
+      lives--;
+      livesDisplay.innerText = "Lives: " + "❤️".repeat(lives);
+      // Play hit sound
+      hitSound.currentTime = 0;
+      hitSound.play();
+      if (lives === 0) {
+        stopGame();
+        // Pause background music and play game over sound
+        backgroundMusic.pause();
+        gameOverSound.currentTime = 0;
+        gameOverSound.play();
+        saveScore();
+        gameOverScreen.style.display = "block";
+      }
+    }
+
+    // Increase level and ball speed every 5 points
+    function updateLevel() {
+      if (score % 5 === 0) {
+        level++;
+        levelDisplay.innerText = "Level: " + level;
+        baseSpeed++;
+      }
+    }
+
+    // Save the player's score to Firebase, only updating if the new score is higher than the previous
+    function saveScore() {
+      const scoreRef = db.ref("scores/" + username);
+      scoreRef.once("value").then((snapshot) => {
+        if (snapshot.exists()) {
+          const previousScore = snapshot.val().score;
+          if (score > previousScore) {
+            scoreRef.set({ name: username, score: score });
+          }
+        } else {
+          scoreRef.set({ name: username, score: score });
+        }
+      });
+    }
+
+    // Fetch and update leaderboard from Firebase
+    function fetchLeaderboard() {
+      db.ref("scores")
+        .orderByChild("score")
+        .limitToLast(10)
+        .on("value", snapshot => {
+          topScores.innerHTML = "";
+          snapshot.forEach(data => {
+            let entry = data.val();
+            let listItem = document.createElement("li");
+            listItem.innerText = `${entry.name}: ${entry.score}`;
+            topScores.prepend(listItem);
+          });
+        });
+    }
+
+    // Retry button: Reset game state and restart ball and obstacle creation
+    retryBtn.addEventListener("click", function () {
+      resetGameState();
+      gameOverScreen.style.display = "none";
+      startBallCreation();
+      startObstacleCreation();
+      // Restart background music
+      backgroundMusic.currentTime = 0;
+      backgroundMusic.play();
+    });
+  </script>
+</body>
+</html>
