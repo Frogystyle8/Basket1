@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Ensure proper mobile scaling -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Catch the Ball - Mobile</title>
+  <!-- Firebase compat libraries for namespaced syntax -->
+  <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.15.0/firebase-database-compat.js"></script>
+  <style>
+    /* Basic reset and body centering using flexbox */
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      text-align: center;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+    /* ----------------- Start Menu ----------------- */
+    #startMenu {
+      background: white;
+      padding: 20px;
+      border: 2px solid black;
+      z-index: 30;
+    }
+    /* ----------------- Customize Scene ----------------- */
+    #customizeScene {
+      position: relative;
+      width: 320px;
+      height: 480px;
+      background: linear-gradient(to bottom, #fff, #eee);
+      border: 1px solid #999;
+      display: none;
+      box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+    }
+    #customizeScene h2 { margin-top: 20px; }
+    #basketPreview {
+      width: 150px;
+      height: 50px;
+      margin: 20px auto;
+      position: relative;
+      border: 2px solid #333;
+      border-radius: 8px;
+      box-shadow: 2px 2px 5px rgba(0,0,0,0.5);
+    }
+    #arrowContainer { margin: 20px; }
+    button.arrowBtn {
+      font-size: 20px; padding: 5px 10px; margin: 0 10px; cursor: pointer;
+    }
+    /* Three buttons: OK, Settings, and Achievements */
+    #okBtn, #settingsBtn, #achievementsBtn {
+      padding: 10px 20px; font-size: 16px; 
+      color: white; border: none; cursor: pointer; margin-top: 20px;
+    }
+    #okBtn { background: #28a745; }
+    #settingsBtn { background: #0077cc; margin-right: 5px; }
+    #achievementsBtn { background: #FF69B4; margin-left: 5px; }
+    /* ----------------- Settings Screen ----------------- */
+    #settingsScreen {
+      position: relative;
+      width: 320px;
+      height: 480px;
+      background: linear-gradient(to bottom, #f7f7f7, #ddd);
+      border: 1px solid #999;
+      display: none;
+      box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+      padding-top: 20px;
+    }
+    #settingsScreen h2 { margin-top: 0; }
+    #settingsScreen label {
+      font-size: 14px; display: block; margin-top: 15px;
+    }
+    #settingsScreen input[type="range"] { width: 80%; }
+    #backFromSettingsBtn {
+      margin-top: 30px; padding: 10px 20px; font-size: 16px;
+      background: #28a745; color: white; border: none; cursor: pointer;
+    }
+    /* ----------------- Achievements Screen ----------------- */
+    #achievementsScreen {
+      position: relative;
+      width: 320px;
+      height: 480px;
+      background: linear-gradient(to bottom, #f7f7f7, #ddd);
+      border: 1px solid #999;
+      display: none;
+      box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+      padding-top: 20px;
+    }
+    #achievementsScreen h2 { margin-top: 0; }
+    #achievementsList {
+      text-align: left;
+      margin: 15px 20px;
+      font-size: 14px;
+    }
+    .achievementItem {
+      display: flex; align-items: center; margin-bottom: 10px;
+    }
+    .achievementIndicator {
+      display: inline-block;
+      width: 15px; height: 15px;
+      border-radius: 50%; margin-right: 10px;
+      background: red; /* red if not unlocked, will turn green when achieved */
+    }
+    #backFromAchievementsBtn {
+      margin-top: 30px; padding: 10px 20px; font-size: 16px;
+      background: #28a745; color: white; border: none; cursor: pointer;
+    }
+    /* ----------------- Game Container ----------------- */
+    #gameContainer {
+      position: relative;
+      width: 320px;
+      height: 480px;
+      background: linear-gradient(to bottom, #87CEFA, #f0f8ff);
+      border: 1px solid #999;
+      box-shadow: 2px 2px 6px rgba(0,0,0,0.3);
+      overflow: hidden;
+      display: none;
+    }
+    /* ----------------- Animated Clouds ----------------- */
+    .cloud {
+      position: absolute;
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 50%;
+      box-shadow: 0 0 10px rgba(255,255,255,0.9);
+      opacity: 0.9;
+      animation: floatClouds linear infinite;
+    }
+    #cloud1 {
+      width: 50px; height: 30px; top: 10%; left: -50px;
+      animation-duration: 25s;
+    }
+    #cloud2 {
+      width: 70px; height: 40px; top: 20%; left: -70px;
+      animation-duration: 35s;
+    }
+    @keyframes floatClouds {
+      from { transform: translateX(0); }
+      to { transform: translateX(400px); }
+    }
+    /* ----------------- Basket Styles ----------------- */
+    #basket {
+      position: absolute;
+      width: 15%; height: 8%;
+      bottom: 2%; left: 50%;
+      transform: translateX(-50%);
+      z-index: 50;
+    }
+    .basketStyle1 {
+      background: linear-gradient(to bottom, #8B4513, #A0522D);
+      border: 2px solid #654321;
+      border-radius: 8px;
+    }
+    .basketStyle2 {
+      background: linear-gradient(to bottom, #FF8C00, #FFA500);
+      border: 2px solid #CD661D;
+      border-radius: 50%;
+    }
+    .basketStyle3 {
+      background: linear-gradient(to bottom, #FFDAB9, #FFB6C1);
+      border: 2px solid #FF69B4;
+      border-radius: 10px;
+    }
+    .basketStyle4 {
+      background: linear-gradient(to bottom, #2F4F4F, #696969);
+      border: 2px solid #000;
+      border-radius: 4px;
+    }
+    .basketStyle5 {
+      background: linear-gradient(to bottom, #1E90FF, #00BFFF);
+      border: 2px solid #00008B;
+      border-radius: 12px;
+    }
+    .basketStyle1::after,
+    .basketStyle2::after,
+    .basketStyle3::after,
+    .basketStyle4::after,
+    .basketStyle5::after {
+      content: "";
+      position: absolute;
+      top: -10px; left: 50%;
+      transform: translateX(-50%);
+      width: 40%; height: 10px;
+      background: #333; border-radius: 50%;
+    }
+    /* ----------------- Detailed Ball & Obstacle ----------------- */
+    .ball {
+      position: absolute;
+      width: 5%; height: 5%;
+      background: radial-gradient(circle at 30% 30%, #ff4444, #cc0000);
+      border: 1px solid #990000;
+      border-radius: 50%;
+      box-shadow: 1px 1px 5px rgba(0,0,0,0.5);
+    }
+    .obstacle {
+      position: absolute;
+      width: 6%; height: 6%;
+      background: radial-gradient(circle, #777, #333);
+      border: 1px solid #111;
+      border-radius: 50%;
+      box-shadow: 1px 1px 4px rgba(0,0,0,0.7);
+    }
+    /* ----------------- Particle Effects ----------------- */
+    .particle {
+      position: absolute;
+      width: 4px; height: 4px;
+      background: gold;
+      border-radius: 50%;
+      pointer-events: none;
+      opacity: 1;
+      animation: particleFade 0.6s forwards;
+    }
+    @keyframes particleFade {
+      to { transform: translateY(-20px); opacity: 0; }
+    }
+    /* ----------------- Game Information ----------------- */
+    #score, #level, #lives {
+      font-size: 16px;
+      position: absolute;
+      z-index: 40;
+    }
+    #score { left: 5%; top: 5%; }
+    #level { left: 5%; top: 25%; }
+    #lives { right: 5%; top: 5%; }
+    /* ----------------- Leaderboard ----------------- */
+    #leaderboard {
+      position: absolute;
+      right: 2%; top: 35%;
+      background: rgba(255,255,255,0.8);
+      padding: 5px;
+      border: 1px solid black;
+      font-size: 14px;
+      max-width: 40%;
+      text-align: left;
+      z-index: 60;
+    }
+    #leaderboard h3 { margin: 0; font-size: 16px; }
+    #leaderboard ul { list-style: none; padding: 0; margin: 5px 0 0 0; }
+    #leaderboard li { margin: 2px 0; }
+    /* ----------------- Game Over Overlay ----------------- */
+    #gameOver {
+      display: none;
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      background: white;
+      padding: 20px;
+      border: 2px solid black;
+      z-index: 100;
+      text-align: center;
+    }
+    #retryBtn, #helpBtn, #customizeBtn {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 5px;
+      cursor: pointer;
+      border: none;
+      color: white;
+    }
+    #retryBtn { background: green; }
+    #helpBtn { background: #0077cc; }
+    #customizeBtn { background: #FF69B4; }
+    #helpText {
+      display: none;
+      font-size: 14px;
+      color: #000;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <!-- ----------------- Start Menu ----------------- -->
+  <div id="startMenu">
+    <h2>Enter Your Name</h2>
+    <input type="text" id="usernameInput" placeholder="Your Name" />
+    <br /><br />
+    <button id="startBtn">Start Game</button>
+  </div>
+
+  <!-- ----------------- Customize Scene ----------------- -->
+  <div id="customizeScene">
+    <h2>Customize Your Basket</h2>
+    <div id="basketPreview" class="basketStyle1"></div>
+    <div id="arrowContainer">
+      <button id="arrowLeft" class="arrowBtn">←</button>
+      <button id="arrowRight" class="arrowBtn">→</button>
+    </div>
+    <button id="okBtn">OK</button>
+    <br/><br/>
+    <button id="settingsBtn">Settings</button>
+    <button id="achievementsBtn">Achievements</button>
+  </div>
+
+  <!-- ----------------- Settings Screen ----------------- -->
+  <div id="settingsScreen">
+    <h2>Settings</h2>
+    <label for="musicVolumeSlider">Music Volume:</label>
+    <input type="range" id="musicVolumeSlider" min="0" max="100" value="100"/>
+    <br/>
+    <label for="effectVolumeSlider">Effects Volume:</label>
+    <input type="range" id="effectVolumeSlider" min="0" max="100" value="100"/>
+    <br/><br/>
+    <button id="backFromSettingsBtn">Back</button>
+  </div>
+
+  <!-- ----------------- Achievements Screen ----------------- -->
+  <div id="achievementsScreen">
+    <h2>Achievements</h2>
+    <div id="achievementsList"></div>
+    <button id="backFromAchievementsBtn">Back</button>
+  </div>
+
+  <!-- ----------------- Game Container ----------------- -->
+  <div id="gameContainer">
+    <!-- Animated Clouds -->
+    <div id="cloud1" class="cloud"></div>
+    <div id="cloud2" class="cloud"></div>
+    
+    <!-- Game Information -->
+    <div id="score">Score: 0</div>
+    <div id="level">Level: 1</div>
+    <div id="lives">Lives: ❤️❤️❤️</div>
+    
+    <!-- The Basket -->
+    <div id="basket" class="basketStyle1"></div>
+    
+    <!-- Leaderboard -->
+    <div id="leaderboard">
+      <h3>Leaderboard</h3>
+      <ul id="topScores"></ul>
+    </div>
+    
+    <!-- Game Over Overlay -->
+    <div id="gameOver">
+      <h2>You Lost!</h2>
+      <button id="retryBtn">Retry</button>
+      <button id="helpBtn">Help</button>
+      <button id="customizeBtn">Customize</button>
+      <div id="helpText">Collect the red ones and evade the black ones.</div>
+    </div>
+  </div>
+
+  <script>
+    // --- Sound Effects and Music Setup ---
+    const backgroundMusic = new Audio("Pixel-Peeker-Polka-faster(chosic.com).mp3");
+    backgroundMusic.loop = true;
+    const catchSound = new Audio("361887__jalastram__gui-sound-effects_059.wav");
+    const hitSound = new Audio("hitSound.mp3"); // update if desired
+    const gameOverSound = new Audio("gameOverSound.mp3"); // update if desired
+
+    // Global volume values (0–1)
+    let musicVolume = 1;
+    let effectsVolume = 1;
+    backgroundMusic.volume = musicVolume;
+    catchSound.volume = effectsVolume;
+    hitSound.volume = effectsVolume;
+    gameOverSound.volume = effectsVolume;
+
+    // --- Firebase Setup ---
+    const firebaseConfig = {
+      databaseURL: "https://leaderboardgame-87e4d-default-rtdb.europe-west1.firebasedatabase.app/"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // --- Achievements Data ---
+    const achievementsData = [
+      { name: "Precision Master", description: "Catch 50 balls in a row without missing", achieved: false },
+      { name: "Combo King", description: "Catch 10 balls in a row", achieved: false },
+      { name: "Speed Demon", description: "Catch 10 balls in under 10 seconds", achieved: false },
+      { name: "Survivor Mode", description: "Play for 5 minutes", achieved: false },
+      { name: "First Steps", description: "Score 100 points", achieved: false },
+      { name: "Pro Player", description: "Reach 1,000 points", achieved: false },
+      { name: "Legend Status", description: "Hit 10,000 points", achieved: false },
+      { name: "Lucky Catch", description: "Catch a rare golden ball", achieved: false },
+      { name: "Ultimate Dodge", description: "Avoid 20 obstacles in a row", achieved: false },
+      { name: "Leaderboard Crusher", description: "Score at least 400 points", achieved: false },
+      { name: "Friendly Rivalry", description: "Score at least 250 points", achieved: false }
+    ];
+
+    // --- Global Achievement Tracking Variables ---
+    let currentCombo = 0;
+    let firstCatchTime = null;
+    let gameStartTime = null;
+    let dodgeCombo = 0;
+    let luckyCatchAchieved = false;
+    let achInterval; // Interval for checking time-based achievements
+
+    // --- DOM Elements ---
+    let username = "";
+    const startMenu = document.getElementById("startMenu");
+    const startBtn = document.getElementById("startBtn");
+    const customizeScene = document.getElementById("customizeScene");
+    const basketPreview = document.getElementById("basketPreview");
+    const arrowLeft = document.getElementById("arrowLeft");
+    const arrowRight = document.getElementById("arrowRight");
+    const okBtn = document.getElementById("okBtn");
+    const settingsBtn = document.getElementById("settingsBtn");
+    const achievementsBtn = document.getElementById("achievementsBtn");
+
+    const settingsScreen = document.getElementById("settingsScreen");
+    const musicVolumeSlider = document.getElementById("musicVolumeSlider");
+    const effectVolumeSlider = document.getElementById("effectVolumeSlider");
+    const backFromSettingsBtn = document.getElementById("backFromSettingsBtn");
+
+    const achievementsScreen = document.getElementById("achievementsScreen");
+    const achievementsList = document.getElementById("achievementsList");
+    const backFromAchievementsBtn = document.getElementById("backFromAchievementsBtn");
+
+    const gameContainer = document.getElementById("gameContainer");
+    const usernameInput = document.getElementById("usernameInput");
+    const scoreDisplay = document.getElementById("score");
+    const levelDisplay = document.getElementById("level");
+    const livesDisplay = document.getElementById("lives");
+    const basket = document.getElementById("basket");
+    const leaderboard = document.getElementById("leaderboard");
+    const topScores = document.getElementById("topScores");
+    const gameOverScreen = document.getElementById("gameOver");
+    const retryBtn = document.getElementById("retryBtn");
+    const helpBtn = document.getElementById("helpBtn");
+    const customizeBtn = document.getElementById("customizeBtn");
+    const helpText = document.getElementById("helpText");
+
+    // --- Customization Variables ---
+    let selectedBasketIndex = 0;
+    const basketDesigns = ["basketStyle1", "basketStyle2", "basketStyle3", "basketStyle4", "basketStyle5"];
+    arrowLeft.addEventListener("click", () => {
+      selectedBasketIndex = (selectedBasketIndex - 1 + basketDesigns.length) % basketDesigns.length;
+      updateBasketPreview();
+    });
+    arrowRight.addEventListener("click", () => {
+      selectedBasketIndex = (selectedBasketIndex + 1) % basketDesigns.length;
+      updateBasketPreview();
+    });
+    function updateBasketPreview() {
+      basketPreview.className = "";
+      basketPreview.classList.add(basketDesigns[selectedBasketIndex]);
+    }
+    updateBasketPreview();
+
+    // --- Achievement Update Function ---
+    function updateAchievements() {
+      // Precision Master: 50 in a row
+      if (!achievementsData[0].achieved && currentCombo >= 50) {
+        achievementsData[0].achieved = true;
+      }
+      // Combo King: 10 in a row
+      if (!achievementsData[1].achieved && currentCombo >= 10) {
+        achievementsData[1].achieved = true;
+      }
+      // Speed Demon: 10 caught and within 10 seconds of the first catch
+      if (!achievementsData[2].achieved && firstCatchTime && currentCombo >= 10 && ((Date.now() - firstCatchTime) / 1000) <= 10) {
+        achievementsData[2].achieved = true;
+      }
+      // Survivor Mode: 5 minutes (300,000 ms) played
+      if (!achievementsData[3].achieved && gameStartTime && (Date.now() - gameStartTime) >= 300000) {
+        achievementsData[3].achieved = true;
+      }
+      // First Steps: Score >= 100
+      if (!achievementsData[4].achieved && score >= 100) {
+        achievementsData[4].achieved = true;
+      }
+      // Pro Player: Score >= 1000
+      if (!achievementsData[5].achieved && score >= 1000) {
+        achievementsData[5].achieved = true;
+      }
+      // Legend Status: Score >= 10000
+      if (!achievementsData[6].achieved && score >= 10000) {
+        achievementsData[6].achieved = true;
+      }
+      // Lucky Catch: If a golden ball was caught
+      if (!achievementsData[7].achieved && luckyCatchAchieved) {
+        achievementsData[7].achieved = true;
+      }
+      // Ultimate Dodge: 20 obstacles dodged
+      if (!achievementsData[8].achieved && dodgeCombo >= 20) {
+        achievementsData[8].achieved = true;
+      }
+      // Leaderboard Crusher: Score >= 400
+      if (!achievementsData[9].achieved && score >= 400) {
+        achievementsData[9].achieved = true;
+      }
+      // Friendly Rivalry: Score >= 250
+      if (!achievementsData[10].achieved && score >= 250) {
+        achievementsData[10].achieved = true;
+      }
+    }
+
+    // --- Achievements UI Update ---
+    function updateAchievementsUI() {
+      achievementsList.innerHTML = "";
+      achievementsData.forEach(ach => {
+        const item = document.createElement("div");
+        item.className = "achievementItem";
+        const indicator = document.createElement("span");
+        indicator.className = "achievementIndicator";
+        indicator.style.background = ach.achieved ? "green" : "red";
+        const text = document.createElement("span");
+        text.innerText = ach.name + " – " + ach.description;
+        item.appendChild(indicator);
+        item.appendChild(text);
+        achievementsList.appendChild(item);
+      });
+    }
+
+    // --- Button Event Listeners ---
+    // OK button: Confirm customization, initialize game state, set gameStartTime, and start the game.
+    okBtn.addEventListener("click", () => {
+      customizeScene.style.display = "none";
+      basket.className = basketDesigns[selectedBasketIndex];
+      resetGameState();
+      gameContainer.style.display = "block";
+      gameStartTime = Date.now();
+      firstCatchTime = null;
+      luckyCatchAchieved = false;
+      dodgeCombo = 0;
+      fetchLeaderboard();
+      startBallCreation();
+      startObstacleCreation();
+      backgroundMusic.currentTime = 0;
+      backgroundMusic.play();
+      // Also start an interval to update achievements (for time-based conditions)
+      achInterval = setInterval(updateAchievements, 1000);
+    });
+
+    // Settings button: Open Settings Screen
+    settingsBtn.addEventListener("click", () => {
+      customizeScene.style.display = "none";
+      settingsScreen.style.display = "block";
+      musicVolumeSlider.value = musicVolume * 100;
+      effectVolumeSlider.value = effectsVolume * 100;
+    });
+
+    // Achievements button: Open Achievements Screen and update its UI
+    achievementsBtn.addEventListener("click", () => {
+      customizeScene.style.display = "none";
+      updateAchievementsUI();
+      achievementsScreen.style.display = "block";
+    });
+
+    backFromSettingsBtn.addEventListener("click", () => {
+      settingsScreen.style.display = "none";
+      customizeScene.style.display = "block";
+    });
+
+    backFromAchievementsBtn.addEventListener("click", () => {
+      achievementsScreen.style.display = "none";
+      customizeScene.style.display = "block";
+    });
+
+    // Adjust music and effects volume with sliders
+    musicVolumeSlider.addEventListener("input", (e) => {
+      musicVolume = e.target.value / 100;
+      backgroundMusic.volume = musicVolume;
+    });
+    effectVolumeSlider.addEventListener("input", (e) => {
+      effectsVolume = e.target.value / 100;
+      catchSound.volume = effectsVolume;
+      hitSound.volume = effectsVolume;
+      gameOverSound.volume = effectsVolume;
+    });
+
+    // Start menu button: Go to Customize Scene
+    startBtn.addEventListener("click", () => {
+      username = usernameInput.value.trim();
+      if (username === "") {
+        alert("Please enter your name!");
+        return;
+      }
+      startMenu.style.display = "none";
+      customizeScene.style.display = "block";
+    });
+
+    // In Game Over overlay, Customize button: reset state and return to customization
+    customizeBtn.addEventListener("click", () => {
+      stopGame();
+      resetGameState();
+      gameOverScreen.style.display = "none";
+      customizeScene.style.display = "block";
+      backgroundMusic.pause();
+      clearInterval(achInterval);
+    });
+
+    // Help button toggles help text display in game over overlay
+    helpBtn.addEventListener("click", () => {
+      helpText.style.display = (helpText.style.display === "none" || helpText.style.display === "") 
+        ? "block" : "none";
+    });
+
+    // --- Touch Control for Basket Movement ---
+    gameContainer.addEventListener("touchmove", function (event) {
+      event.preventDefault();
+      const containerRect = gameContainer.getBoundingClientRect();
+      let touchX = event.touches[0].clientX - containerRect.left - basket.clientWidth / 2;
+      if (touchX < 0) touchX = 0;
+      if (touchX > gameContainer.clientWidth - basket.clientWidth) 
+        touchX = gameContainer.clientWidth - basket.clientWidth;
+      basket.style.left = touchX + "px";
+    });
+
+    // --- Game State Variables ---
+    let score = 0, lives = 3, level = 1, baseSpeed = 3;
+    let ballInterval, obstacleInterval;
+
+    // Reset game state and update UI
+    function resetGameState() {
+      clearInterval(ballInterval);
+      clearInterval(obstacleInterval);
+      clearInterval(achInterval);
+      score = 0;
+      lives = 3;
+      level = 1;
+      baseSpeed = 3;
+      currentCombo = 0;
+      dodgeCombo = 0;
+      firstCatchTime = null;
+      scoreDisplay.innerText = "Score: 0";
+      levelDisplay.innerText = "Level: 1";
+      livesDisplay.innerText = "Lives: ❤️❤️❤️";
+    }
+
+    // Start falling balls
+    function startBallCreation() {
+      ballInterval = setInterval(createBall, 1200);
+    }
+
+    // Start falling obstacles
+    function startObstacleCreation() {
+      obstacleInterval = setInterval(createObstacle, 2500);
+    }
+
+    // Stop both ball and obstacle creation
+    function stopGame() {
+      clearInterval(ballInterval);
+      clearInterval(obstacleInterval);
+    }
+
+    // Create a falling ball with a chance to be golden
+    function createBall() {
+      let ball = document.createElement("div");
+      ball.classList.add("ball");
+      // Set initial position
+      ball.style.left = Math.random() * (gameContainer.clientWidth - 20) + "px";
+      ball.style.top = "0px";
+      // 10% chance to be golden (for Lucky Catch)
+      if (Math.random() < 0.10) {
+        ball.classList.add("golden");
+        // Optionally change appearance:
+        ball.style.background = "gold";
+      }
+      gameContainer.appendChild(ball);
+
+      let fallSpeed = baseSpeed + Math.floor(Math.random() * 5);
+      let fallInterval = setInterval(() => {
+        let ballTop = parseInt(ball.style.top) || 0;
+        if (ballTop > gameContainer.clientHeight - 40) {
+          clearInterval(fallInterval);
+          if (gameContainer.contains(ball))
+            gameContainer.removeChild(ball);
+          loseLife();
+        } else {
+          ball.style.top = ballTop + fallSpeed + "px";
+        }
+        let basketRect = basket.getBoundingClientRect();
+        let ballRect = ball.getBoundingClientRect();
+        if (
+          ballRect.bottom >= basketRect.top &&
+          ballRect.left < basketRect.right &&
+          ballRect.right > basketRect.left
+        ) {
+          clearInterval(fallInterval);
+          if (gameContainer.contains(ball))
+            gameContainer.removeChild(ball);
+          score++;
+          scoreDisplay.innerText = "Score: " + score;
+          // Update combo counters
+          if (!firstCatchTime) firstCatchTime = Date.now();
+          currentCombo++;
+          updateAchievements();
+          // If the ball is golden, flag Lucky Catch achievement
+          if (ball.classList.contains("golden")) {
+            luckyCatchAchieved = true;
+            updateAchievements();
+          }
+          // Play catch sound effect
+          catchSound.currentTime = 0;
+          catchSound.play();
+          let containerRect = gameContainer.getBoundingClientRect();
+          let particleX = basketRect.left + basketRect.width / 2 - containerRect.left;
+          let particleY = basketRect.top - containerRect.top;
+          showParticles(particleX, particleY);
+          // Check score thresholds for achievements
+          updateAchievements();
+        }
+      }, 30);
+    }
+
+    // Create a falling obstacle; if it passes without collision, increment dodge combo
+    function createObstacle() {
+      let obstacle = document.createElement("div");
+      obstacle.classList.add("obstacle");
+      obstacle.style.left = Math.random() * (gameContainer.clientWidth - 30) + "px";
+      obstacle.style.top = "0px";
+      gameContainer.appendChild(obstacle);
+
+      let fallSpeed = baseSpeed + Math.floor(Math.random() * 3) + 2;
+      let fallInterval = setInterval(() => {
+        let obstacleTop = parseInt(obstacle.style.top) || 0;
+        if (obstacleTop > gameContainer.clientHeight - 30) {
+          clearInterval(fallInterval);
+          if (gameContainer.contains(obstacle))
+            gameContainer.removeChild(obstacle);
+          dodgeCombo++;
+          updateAchievements();
+        } else {
+          obstacle.style.top = obstacleTop + fallSpeed + "px";
+        }
+        let basketRect = basket.getBoundingClientRect();
+        let obstacleRect = obstacle.getBoundingClientRect();
+        if (
+          obstacleRect.bottom >= basketRect.top &&
+          obstacleRect.left < basketRect.right &&
+          obstacleRect.right > basketRect.left
+        ) {
+          clearInterval(fallInterval);
+          if (gameContainer.contains(obstacle))
+            gameContainer.removeChild(obstacle);
+          loseLife();
+        }
+      }, 30);
+    }
+
+    // Create particle effects at the given position
+    function showParticles(x, y) {
+      for (let i = 0; i < 8; i++) {
+        let particle = document.createElement("div");
+        particle.classList.add("particle");
+        particle.style.left = x + "px";
+        particle.style.top = y + "px";
+        gameContainer.appendChild(particle);
+        setTimeout(() => {
+          if (gameContainer.contains(particle))
+            gameContainer.removeChild(particle);
+        }, 600);
+      }
+    }
+
+    // Handle lost life: decrement lives, reset combo, play hit sound, and if game over, pause music, clear achievement interval, and show overlay
+    function loseLife() {
+      lives--;
+      livesDisplay.innerText = "Lives: " + "❤️".repeat(lives);
+      currentCombo = 0;
+      hitSound.currentTime = 0;
+      hitSound.play();
+      if (lives === 0) {
+        stopGame();
+        backgroundMusic.pause();
+        clearInterval(achInterval);
+        gameOverSound.currentTime = 0;
+        gameOverSound.play();
+        saveScore();
+        gameOverScreen.style.display = "block";
+      }
+    }
+
+    // Increase level (and ball speed) every 5 points
+    function updateLevel() {
+      if (score % 5 === 0) {
+        level++;
+        levelDisplay.innerText = "Level: " + level;
+        baseSpeed++;
+      }
+    }
+
+    // Save high score to Firebase (only if new score is higher)
+    function saveScore() {
+      const scoreRef = db.ref("scores/" + username);
+      scoreRef.once("value").then((snapshot) => {
+        if (snapshot.exists()) {
+          const previousScore = snapshot.val().score;
+          if (score > previousScore) {
+            scoreRef.set({ name: username, score: score });
+          }
+        } else {
+          scoreRef.set({ name: username, score: score });
+        }
+      });
+    }
+
+    // Fetch leaderboard data from Firebase
+    function fetchLeaderboard() {
+      db.ref("scores")
+        .orderByChild("score")
+        .limitToLast(10)
+        .on("value", snapshot => {
+          topScores.innerHTML = "";
+          snapshot.forEach(data => {
+            let entry = data.val();
+            let listItem = document.createElement("li");
+            listItem.innerText = `${entry.name}: ${entry.score}`;
+            topScores.prepend(listItem);
+          });
+        });
+    }
+
+    // Retry button: Reset state and restart gameplay (also restart background music and achievement updates)
+    retryBtn.addEventListener("click", function () {
+      resetGameState();
+      gameOverScreen.style.display = "none";
+      startBallCreation();
+      startObstacleCreation();
+      backgroundMusic.currentTime = 0;
+      backgroundMusic.play();
+    });
+  </script>
+</body>
+</html>
